@@ -17,8 +17,9 @@ func addNode(parent *Node, action string) *Node {
 	return &node
 }
 
-func removeNode(n *Node) {
-	// TODO: remove node from tree
+func removeNode(n *Node) bool{
+	// TODO: remove node from tree and return true if successful
+	return true
 }
 
 func (n Node) getPossibleMoves() []string {
