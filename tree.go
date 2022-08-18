@@ -1,5 +1,11 @@
 package main
 
+import (
+	"time"
+
+	queue "github.com/eapache/queue"
+)
+
 type Node struct {
 	parent   *Node
 	children []*Node
@@ -8,20 +14,7 @@ type Node struct {
 	reward   int
 }
 
-func addNode(parent *Node, action string) *Node {
-	// TODO: create new node
-	node := Node{}
-
-	// TODO: update parent
-
-	return &node
-}
-
-func removeNode(n *Node) bool{
-	// TODO: remove node from tree and return true if successful
-	return true
-}
-
+// get valid moves in a position
 func (n Node) getPossibleMoves() []string {
 	possibleMoves := []string{"up", "down", "left", "right"}
 
@@ -32,28 +25,54 @@ func (n Node) getPossibleMoves() []string {
 	return possibleMoves
 }
 
+// determine if node is terminal
 func (n Node) isTerminal() bool {
-	// TODO: determine if node is terminal
-
 	return false
 }
 
-func (state GameState) applyAction(action string) *GameState {
+// apply action to node, returning new node
+func (n Node) applyAction(action string) *Node {
 	// Create new state
-	var nextState GameState
-	nextState.Game = state.Game
-	nextState.Turn = state.Turn + 1
-	nextState.Board = state.Board
-	nextState.You = state.You
+	newNode := Node{}
 
 	// TODO: apply action to state
 
-	return &nextState
+	return &newNode
 }
 
-func buildTree(state GameState, timeoutMS int) *Node {
-	// TODO: iteratively build tree until timout and return root
-	root := Node{}
+// Add and return children
+func expand(n *Node) []*Node {
+	children := make([]*Node, 0, 3)
+	for _, action := range n.getPossibleMoves() {
+		children = append(children, n.applyAction(action))
+	}
+	return children
+}
+
+func buildTree(state *GameState, timeoutMS time.Duration) *Node {
+	// start timer
+	start := time.Now()
+
+	// init root and curr
+	root := Node{nil, nil, 0, state, 0}
+
+	// create explore queue
+	explore := queue.New()
+
+	// enqueue root
+	explore.Add(root)
+
+	// build tree
+	for time.Since(start) < timeoutMS {
+		// get next node to explore
+		curr := explore.Remove().(Node)
+		// expand node and enqueue children
+		if !curr.isTerminal() {
+			for _, child := range expand(&curr) {
+				explore.Add(child)
+			}
+		}
+	}
 
 	return &root
 }
