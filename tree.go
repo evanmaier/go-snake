@@ -15,7 +15,7 @@ type Node struct {
 }
 
 // get valid moves in a position
-func (n Node) getPossibleMoves() []string {
+func (n *Node) getPossibleMoves() []string {
 	possibleMoves := []string{"up", "down", "left", "right"}
 
 	// TODO: avoid walls
@@ -26,7 +26,7 @@ func (n Node) getPossibleMoves() []string {
 }
 
 // determine if node is terminal
-func (n Node) isTerminal() bool {
+func (n *Node) isTerminal() bool {
 	if n.State.You.Health == 0 {
 		return true
 	}
@@ -36,8 +36,17 @@ func (n Node) isTerminal() bool {
 	return false
 }
 
+// evaluate game state and return reward
+func (n *Node) getReward() {
+	if n.isTerminal() {
+		n.Reward = -1
+	} else {
+		n.Reward = n.State.Turn
+	}
+}
+
 // apply action to node, returning new node
-func (n Node) applyAction(action string) *Node {
+func (n *Node) applyAction(action string) *Node {
 	// create new state
 	newState := &GameState{
 		Game:  n.State.Game,
@@ -48,7 +57,7 @@ func (n Node) applyAction(action string) *Node {
 
 	// Create new node
 	newNode := Node{
-		Parent: &n,
+		Parent: n,
 		Player: (n.Player + 1) % len(n.State.Board.Snakes),
 		State:  newState,
 	}
@@ -57,8 +66,12 @@ func (n Node) applyAction(action string) *Node {
 	if newNode.Player == 0 {
 		updateSnake(&newState.You, newState, action)
 	}
+
 	// update Snakes
 	updateSnake(&newState.Board.Snakes[newNode.Player], newState, action)
+
+	// get reward
+	newNode.getReward()
 
 	return &newNode
 }
@@ -68,7 +81,6 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	moveHead(snake, action)
 	snake.Body = prependCoord(snake.Body, snake.Head) // TODO: pass by reference
 	// move tail
-	println(len(snake.Body))
 	snake.Body = snake.Body[:(len(snake.Body) - 1)]
 	// update health
 	if eatFood(state, snake.Head) {
