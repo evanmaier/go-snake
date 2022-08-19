@@ -27,86 +27,79 @@ func (n Node) getPossibleMoves() []string {
 
 // determine if node is terminal
 func (n Node) isTerminal() bool {
-  if n.State.You.Health == 0 {
-    return true
-  }
-  if len(n.getPossibleMoves()) == 0 {
-    return true
-  }
+	if n.State.You.Health == 0 {
+		return true
+	}
+	if len(n.getPossibleMoves()) == 0 {
+		return true
+	}
 	return false
 }
 
 // apply action to node, returning new node
 func (n Node) applyAction(action string) *Node {
 	// create new state
-  newState := GameState{
-    Game: n.State.Game
-    Turn: n.State.Turn
-    Board: n.State.Board
-    You: n.State.You
-  }
+	newState := &GameState{
+		Game:  n.State.Game,
+		Turn:  n.State.Turn,
+		Board: n.State.Board,
+		You:   n.State.You,
+	}
 
-  // Create new node
+	// Create new node
 	newNode := Node{
-    Parent: &n,
-    Player: (n.player + 1) % len(n.State.Board.Snakes)
-    State: newState
-  }
+		Parent: &n,
+		Player: (n.Player + 1) % len(n.State.Board.Snakes),
+		State:  newState,
+	}
 
-  // update You
-  if newNode.Player == 0 {
-    snake := newState.You
-    // move head
-    moveHead(snake, action)
-    prependCoord(snake.Body, snake.Head)
-    // move tail
-    snake.Body = snake.Body[:len(snake.Body) - 1]
-    // update health
-    if eatFood(newState, snake.Head) {
-    snake.Health = 100
-    } else {
-    snake.Health -= 1
-    }
-  }
-  // update Snakes
-  snake := newState.Board.Snakes[newNode.Player]
-  // move head
-  moveHead(snake, action)
-  prependCoord(snake.Body, snake.Head)
-  // move tail
-  snake.Body = snake.Body[:len(snake.Body) - 1]
-  // update health
-  if eatFood(newState, snake.Head) {
-    snake.Health = 100
-  } else {
-    snake.Health -= 1
-  }
+	// update You
+	if newNode.Player == 0 {
+		updateSnake(&newState.You, newState, action)
+	}
+	// update Snakes
+	updateSnake(&newState.Board.Snakes[newNode.Player], newState, action)
 
 	return &newNode
 }
 
-func moveHead (snake *Battlesnake, action string) {
-  // apply action to snake head
-  switch action {
-    case "up":
-      snake.Head.Y += 1
-    case "down":
-      snake.Head.Y -= 1
-    case "left":
-      snake.Head.X -= 1
-    case "right":
-      snake.Head.X += 1
-  }
+func updateSnake(snake *Battlesnake, state *GameState, action string) {
+	// move head
+	moveHead(snake, action)
+	snake.Body = prependCoord(snake.Body, snake.Head) // TODO: pass by reference
+	// move tail
+	println(len(snake.Body))
+	snake.Body = snake.Body[:(len(snake.Body) - 1)]
+	// update health
+	if eatFood(state, snake.Head) {
+		snake.Health = 100
+	} else {
+		snake.Health -= 1
+	}
+}
+
+func moveHead(snake *Battlesnake, action string) {
+	// apply action to snake head
+	switch action {
+	case "up":
+		snake.Head.Y += 1
+	case "down":
+		snake.Head.Y -= 1
+	case "left":
+		snake.Head.X -= 1
+	case "right":
+		snake.Head.X += 1
+	}
 }
 
 // update health after head moves
-func eatFood (state *GameState, head Coord) bool {
-  for _, coord := range state.Board.Food {
-    if coord == head {
-      return true
-    }
-  }
-  return false
+func eatFood(state *GameState, head Coord) bool {
+	for _, coord := range state.Board.Food {
+		if coord == head {
+			return true
+		}
+	}
+	return false
 }
 
 // Add and return children
@@ -118,7 +111,7 @@ func expand(n *Node) []*Node {
 	return children
 }
 
-func buildTree(state *GameState, timeoutMS time.Duration) *Node {
+func buildTree(state *GameState, timeout time.Duration) *Node {
 	// start timer
 	start := time.Now()
 
@@ -129,15 +122,15 @@ func buildTree(state *GameState, timeoutMS time.Duration) *Node {
 	explore := queue.New()
 
 	// enqueue root
-	explore.Add(root)
+	explore.Add(&root)
 
 	// build tree
-	for time.Since(start) < timeoutMS {
+	for time.Since(start) < timeout {
 		// get next node to explore
-		curr := explore.Remove().(Node)
+		curr := explore.Remove().(*Node)
 		// expand node and enqueue children
 		if !curr.isTerminal() {
-			for _, child := range expand(&curr) {
+			for _, child := range expand(curr) {
 				explore.Add(child)
 			}
 		}
@@ -153,8 +146,8 @@ func searchTree(root *Node) string {
 }
 
 func prependCoord(x []Coord, y Coord) []Coord {
-    x = append(x, 0)
-    copy(x[1:], x)
-    x[0] = y
-    return x
+	x = append(x, Coord{0, 0})
+	copy(x[1:], x)
+	x[0] = y
+	return x
 }
