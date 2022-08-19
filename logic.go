@@ -14,7 +14,7 @@ func info() BattlesnakeInfoResponse {
 	log.Println("INFO")
 	return BattlesnakeInfoResponse{
 		APIVersion: "1",
-		Author:     "evanmaier",
+		Author:     "EP",
 		Color:      "#006600",
 		Head:       "missile",
 		Tail:       "default",
