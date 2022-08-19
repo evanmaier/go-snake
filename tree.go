@@ -7,11 +7,9 @@ import (
 )
 
 type Node struct {
-	Parent   *Node
-	Children []*Node
-	Player   int
-	State    *GameState
-	Reward   int
+	Player int
+	State  *GameState
+	Reward int
 }
 
 // get valid moves in a position
@@ -57,7 +55,6 @@ func (n *Node) applyAction(action string) *Node {
 
 	// Create new node
 	newNode := Node{
-		Parent: n,
 		Player: (n.Player + 1) % len(n.State.Board.Snakes),
 		State:  newState,
 	}
@@ -127,8 +124,16 @@ func buildTree(state *GameState, timeout time.Duration) *Node {
 	// start timer
 	start := time.Now()
 
+	// create adjacency list
+	// key = &Node, val = [&child1, &child2 ...]
+	adjList := make(map[*Node][]*Node)
+
 	// init root and curr
-	root := Node{nil, nil, 0, state, 0}
+	root := Node{
+		Player: 0,
+		State:  state,
+		Reward: 0,
+	}
 
 	// create explore queue
 	explore := queue.New()
@@ -140,9 +145,12 @@ func buildTree(state *GameState, timeout time.Duration) *Node {
 	for time.Since(start) < timeout {
 		// get next node to explore
 		curr := explore.Remove().(*Node)
+		// add node to adjacency list
+		adjList[curr] = make([]*Node, 0, 3)
 		// expand node and enqueue children
 		if !curr.isTerminal() {
 			for _, child := range expand(curr) {
+				append(adjList[curr], child)
 				explore.Add(child)
 			}
 		}
