@@ -14,11 +14,70 @@ type Node struct {
 
 // get valid moves in a position
 func (n *Node) getPossibleMoves() []string {
-	possibleMoves := []string{"up", "down", "left", "right"}
+	possibleMoves := make([]string, 0, 4)
+	validMoves := map[string]bool{
+		"up":    true,
+		"down":  true,
+		"right": true,
+		"left":  true,
+	}
+	snake := n.State.Board.Snakes[n.Player]
+	width := n.State.Board.Width
+	height := n.State.Board.Height
 
-	// TODO: avoid walls
+	// avoid walls
+	if height-snake.Head.Y == 1 {
+		validMoves["up"] = false
+	}
+	if snake.Head.Y == 0 {
+		validMoves["down"] = false
+	}
+	if width-snake.Head.X == 1 {
+		validMoves["right"] = false
+	}
+	if snake.Head.X == 0 {
+		validMoves["left"] = false
+	}
 
-	// TODO: avoid snake(s)
+	// avoid snake(s)
+	up := Coord{
+		X: snake.Head.X,
+		Y: snake.Head.Y + 1,
+	}
+	down := Coord{
+		X: snake.Head.X,
+		Y: snake.Head.Y - 1,
+	}
+	right := Coord{
+		X: snake.Head.X + 1,
+		Y: snake.Head.Y,
+	}
+	left := Coord{
+		X: snake.Head.X - 1,
+		Y: snake.Head.Y,
+	}
+
+	for _, snake := range n.State.Board.Snakes {
+		for _, coord := range snake.Body { //TODO: allow moves into tail if not eating
+			switch coord {
+			case up:
+				validMoves["up"] = false
+			case down:
+				validMoves["down"] = false
+			case right:
+				validMoves["right"] = false
+			case left:
+				validMoves["left"] = false
+			}
+		}
+	}
+
+	// fill possible moves
+	for move, valid := range validMoves {
+		if valid {
+			possibleMoves = append(possibleMoves, move)
+		}
+	}
 
 	return possibleMoves
 }
@@ -159,6 +218,7 @@ func buildTree(state *GameState, timeout time.Duration) (*map[*Node][]*Node, *No
 	return &adjList, &root
 }
 
+// print out tree for debugging TODO: pretty printing
 func printTree(adjList *map[*Node][]*Node) {
 	for node, children := range *adjList {
 		println("node address : %p", node)
@@ -169,11 +229,12 @@ func printTree(adjList *map[*Node][]*Node) {
 }
 
 func searchTree(adjList *map[*Node][]*Node, root *Node, debug bool) string {
-	// TODO: search game tree and return best move
+	// print tree if debug == true
 	if debug {
 		printTree(adjList)
 	}
-	
+	// paranoid search algorithm
+
 	return "up"
 }
 
