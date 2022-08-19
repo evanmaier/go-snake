@@ -120,7 +120,7 @@ func expand(n *Node) []*Node {
 	return children
 }
 
-func buildTree(state *GameState, timeout time.Duration) *Node {
+func buildTree(state *GameState, timeout time.Duration) (*map[*Node][]*Node, *Node) {
 	// start timer
 	start := time.Now()
 
@@ -150,18 +150,27 @@ func buildTree(state *GameState, timeout time.Duration) *Node {
 		// expand node and enqueue children
 		if !curr.isTerminal() {
 			for _, child := range expand(curr) {
-				append(adjList[curr], child)
+				adjList[curr] = append(adjList[curr], child)
 				explore.Add(child)
 			}
 		}
 	}
 
-	return &root
+	return &adjList, &root
 }
 
-func searchTree(root *Node) string {
-	// TODO: search game tree and return best move
+func printTree(adjList *map[*Node][]*Node) {
+	for node, children := range *adjList {
+		println("node address : %p", node)
+		for _, child := range children {
+			println("child address: %p", child)
+		}
+	}
+}
 
+func searchTree(adjList *map[*Node][]*Node, root *Node) string {
+	// TODO: search game tree and return best move
+	printTree(adjList)
 	return "up"
 }
 
