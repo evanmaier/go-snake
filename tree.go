@@ -168,9 +168,12 @@ func printTree(adjList *map[*Node][]*Node) {
 	}
 }
 
-func searchTree(adjList *map[*Node][]*Node, root *Node) string {
+func searchTree(adjList *map[*Node][]*Node, root *Node, debug bool) string {
 	// TODO: search game tree and return best move
-	printTree(adjList)
+	if debug {
+		printTree(adjList)
+	}
+	
 	return "up"
 }
 

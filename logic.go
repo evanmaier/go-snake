@@ -39,7 +39,7 @@ func move(state GameState) BattlesnakeMoveResponse {
 	move := BattlesnakeMoveResponse{"up", "default move"}
 	timeout, _ := time.ParseDuration("200ms")
 	adjList, root := buildTree(&state, timeout)
-	move = BattlesnakeMoveResponse{searchTree(adjList, root), "tree search move"} // TODO: add timout
+	move = BattlesnakeMoveResponse{searchTree(adjList, root, false), "tree search move"} // TODO: add timout
 	log.Printf("Move: %s \t Shout: %s", move.Move, move.Shout)
 	return move
 }
