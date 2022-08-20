@@ -1,19 +1,22 @@
 package main
 
 import (
+	"log"
+	"sort"
 	"time"
 
 	queue "github.com/eapache/queue"
 )
 
 type Node struct {
+	Move   string
 	Player int
 	State  *GameState
-	Reward int
+	Reward []int
 }
 
 // get valid moves in a position
-func (n *Node) getPossibleMoves() []string {
+func (n Node) getPossibleMoves() []string {
 	possibleMoves := make([]string, 0, 4)
 	validMoves := map[string]bool{
 		"up":    true,
@@ -83,7 +86,7 @@ func (n *Node) getPossibleMoves() []string {
 }
 
 // determine if node is terminal
-func (n *Node) isTerminal() bool {
+func (n Node) isTerminal() bool {
 	if n.State.You.Health == 0 {
 		return true
 	}
@@ -93,19 +96,15 @@ func (n *Node) isTerminal() bool {
 	return false
 }
 
-// evaluate game state and return reward
+// evaluate game state and update reward
 func (n *Node) getReward() {
-	if n.isTerminal() {
-		n.Reward = -1
-	} else {
-		n.Reward = n.State.Turn
-	}
+	n.Reward[n.Player] = n.State.Turn / len(n.State.Board.Snakes)
 }
 
 // apply action to node, returning new node
-func (n *Node) applyAction(action string) *Node {
+func (n Node) applyAction(action string) *Node {
 	// create new state
-	newState := &GameState{
+	newState := GameState{
 		Game:  n.State.Game,
 		Turn:  n.State.Turn,
 		Board: n.State.Board,
@@ -114,17 +113,20 @@ func (n *Node) applyAction(action string) *Node {
 
 	// Create new node
 	newNode := Node{
+		Move:   action,
 		Player: (n.Player + 1) % len(n.State.Board.Snakes),
-		State:  newState,
+		State:  &newState,
+		Reward: make([]int, len(n.State.Board.Snakes)),
 	}
 
-	// update You
+	// update You & turn
 	if newNode.Player == 0 {
-		updateSnake(&newState.You, newState, action)
+		updateSnake(&newState.You, &newState, action)
+		newState.Turn += 1
 	}
 
 	// update Snakes
-	updateSnake(&newState.Board.Snakes[newNode.Player], newState, action)
+	updateSnake(&newState.Board.Snakes[newNode.Player], &newState, action)
 
 	// get reward
 	newNode.getReward()
@@ -135,7 +137,7 @@ func (n *Node) applyAction(action string) *Node {
 func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	// move head
 	moveHead(snake, action)
-	snake.Body = prependCoord(snake.Body, snake.Head) // TODO: pass by reference
+	snake.Body = append([]Coord{snake.Head}, snake.Body...)
 	// move tail
 	snake.Body = snake.Body[:(len(snake.Body) - 1)]
 	// update health
@@ -179,19 +181,22 @@ func expand(n *Node) []*Node {
 	return children
 }
 
-func buildTree(state *GameState, timeout time.Duration) (*map[*Node][]*Node, *Node) {
+func buildTree(state *GameState, timeout time.Duration) (map[*Node][]*Node, *Node) {
 	// start timer
-	start := time.Now()
+	// start := time.Now()
+
+	// init search depth counter
+	depth := 0
 
 	// create adjacency list
 	// key = &Node, val = [&child1, &child2 ...]
-	adjList := make(map[*Node][]*Node)
+	tree := make(map[*Node][]*Node)
 
-	// init root and curr
+	// init root
 	root := Node{
 		Player: 0,
 		State:  state,
-		Reward: 0,
+		Reward: make([]int, len(state.Board.Snakes)),
 	}
 
 	// create explore queue
@@ -201,46 +206,55 @@ func buildTree(state *GameState, timeout time.Duration) (*map[*Node][]*Node, *No
 	explore.Add(&root)
 
 	// build tree
-	for time.Since(start) < timeout {
+	//for time.Since(start) < timeout {
+	for depth < 10 {
+		// ensure queue is not empty
+		if explore.Length() == 0 {
+			log.Printf("queue is empty!")
+			break
+		}
 		// get next node to explore
 		curr := explore.Remove().(*Node)
+		depth = curr.State.Turn - root.State.Turn
 		// add node to adjacency list
-		adjList[curr] = make([]*Node, 0, 3)
+		tree[curr] = make([]*Node, 0, 3)
 		// expand node and enqueue children
 		if !curr.isTerminal() {
 			for _, child := range expand(curr) {
-				adjList[curr] = append(adjList[curr], child)
+				tree[curr] = append(tree[curr], child)
 				explore.Add(child)
 			}
 		}
 	}
 
-	return &adjList, &root
+	log.Printf("tree depth: %d \t queue length: %d", depth, explore.Length())
+
+	return tree, &root
 }
 
-// print out tree for debugging TODO: pretty printing
-func printTree(adjList *map[*Node][]*Node) {
-	for node, children := range *adjList {
-		println("node address : %p", node)
+func searchTree(tree map[*Node][]*Node, root *Node) BattlesnakeMoveResponse {
+	shout := "tree move"
+	// Max^n search
+	reward := maxN(root, tree)
+	// sort moves by reward
+	children := tree[root]
+	sort.Slice(children, func(i, j int) bool { return children[i].Reward[0] < children[j].Reward[0] })
+	// log reward slice
+	log.Printf("Reward: %d", reward)
+	// return best move response
+	return BattlesnakeMoveResponse{children[0].Move, shout}
+}
+
+func maxN(n *Node, tree map[*Node][]*Node) []int {
+	if children, ok := tree[n]; ok {
+		// n is an internal node, recurse
 		for _, child := range children {
-			println("child address: %p", child)
+			child.Reward = maxN(child, tree)
 		}
+		// find and return best reward for current player
+		sort.Slice(children, func(i, j int) bool { return children[i].Reward[n.Player] < children[j].Reward[n.Player] })
+		return children[0].Reward
 	}
-}
-
-func searchTree(adjList *map[*Node][]*Node, root *Node, debug bool) string {
-	// print tree if debug == true
-	if debug {
-		printTree(adjList)
-	}
-	// paranoid search algorithm
-
-	return "up"
-}
-
-func prependCoord(x []Coord, y Coord) []Coord {
-	x = append(x, Coord{0, 0})
-	copy(x[1:], x)
-	x[0] = y
-	return x
+	// reached leaf node, return reward
+	return n.Reward
 }
