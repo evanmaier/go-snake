@@ -38,8 +38,8 @@ func end(state GameState) {
 func move(state GameState) BattlesnakeMoveResponse {
 	move := BattlesnakeMoveResponse{"up", "default move"}
 	timeout, _ := time.ParseDuration("400ms")
-	adjList, root := buildTree(&state, timeout)
-	bestMove := searchTree(adjList, root) // TODO: add timout
+	adjList, root := buildGameTree(state, timeout)
+	bestMove := searchGameTree(adjList, root) // TODO: add timout
 	validMoves := []string{"up", "down", "right", "left"}
 	for _, m := range validMoves {
 		if bestMove.Move == m {
