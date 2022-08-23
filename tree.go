@@ -9,9 +9,8 @@ import (
 
 type Node struct {
 	Move   string
-	Player int
 	State  GameState
-	Reward []int
+	Reward int
 }
 
 // get valid moves in a position
@@ -23,7 +22,7 @@ func (n Node) getPossibleMoves() []string {
 		"right": true,
 		"left":  true,
 	}
-	snake := n.State.Board.Snakes[n.Player]
+	snake := n.State.You
 	width := n.State.Board.Width
 	height := n.State.Board.Height
 
@@ -59,19 +58,18 @@ func (n Node) getPossibleMoves() []string {
 		Y: snake.Head.Y,
 	}
 
-	for _, snake := range n.State.Board.Snakes {
-		for _, coord := range snake.Body { //TODO: allow moves into tail if not eating
-			switch coord {
-			case up:
-				validMoves["up"] = false
-			case down:
-				validMoves["down"] = false
-			case right:
-				validMoves["right"] = false
-			case left:
-				validMoves["left"] = false
-			}
+	for _, coord := range snake.Body { //TODO: allow moves into tail if not eating
+		switch coord {
+		case up:
+			validMoves["up"] = false
+		case down:
+			validMoves["down"] = false
+		case right:
+			validMoves["right"] = false
+		case left:
+			validMoves["left"] = false
 		}
+
 	}
 
 	// fill possible moves
@@ -86,7 +84,7 @@ func (n Node) getPossibleMoves() []string {
 
 // determine if node is terminal
 func (n Node) isTerminal() bool {
-	if n.State.Board.Snakes[n.Player].Health == 0 {
+	if n.State.You.Health == 0 {
 		return true
 	}
 	if len(n.getPossibleMoves()) == 0 {
@@ -97,7 +95,7 @@ func (n Node) isTerminal() bool {
 
 // evaluate game state and return reward
 func (n Node) getReward() int {
-	return n.State.Turn / len(n.State.Board.Snakes)
+	return n.State.Turn
 }
 
 // return children of node
@@ -122,22 +120,16 @@ func (n Node) applyAction(action string) *Node {
 	// Create new node
 	newNode := Node{
 		Move:   action,
-		Player: (n.Player + 1) % len(n.State.Board.Snakes),
 		State:  newState,
-		Reward: make([]int, len(n.State.Board.Snakes)),
+		Reward: 0,
 	}
 
-	// update You & turn
-	if newNode.Player == 0 {
-		updateSnake(&newNode.State.You, &newNode.State, action)
-		newNode.State.Turn += 1
-	}
-
-	// update Snake
-	updateSnake(&newNode.State.Board.Snakes[newNode.Player], &newNode.State, action)
+	// update snake
+	updateSnake(&newNode.State.You, &newNode.State, action)
+	newNode.State.Turn += 1
 
 	// get reward
-	newNode.Reward[newNode.Player] = newNode.getReward()
+	newNode.Reward = newNode.getReward()
 
 	return &newNode
 }
@@ -187,11 +179,16 @@ func buildGameTree(state GameState, timeout time.Duration) (map[*Node][]*Node, *
 	// key = &Node, val = [&child1, &child2 ...]
 	adjList := make(map[*Node][]*Node)
 
+	// create ID map
+	idMap := make(map[int]string)
+	for i, snake := range state.Board.Snakes {
+		idMap[i] = snake.ID
+	}
+
 	// init root
 	root := Node{
-		Player: 0,
 		State:  state,
-		Reward: make([]int, len(state.Board.Snakes)),
+		Reward: 0,
 	}
 
 	// create explore queue
@@ -206,7 +203,6 @@ func buildGameTree(state GameState, timeout time.Duration) (map[*Node][]*Node, *
 	for depth < 10 {
 		// ensure queue is not empty
 		if exploreQueue.Length() == 0 {
-			log.Printf("queue is empty!")
 			break
 		}
 		// get next node to explore
@@ -216,19 +212,12 @@ func buildGameTree(state GameState, timeout time.Duration) (map[*Node][]*Node, *
 		// add curr to adjList
 		adjList[curr] = curr.getChildren()
 		// add curr's children to explore queue
-		for _, child := range curr.getChildren() {
+		for _, child := range adjList[curr] {
 			exploreQueue.Add(child)
 		}
 	}
 
-	log.Printf("game tree depth: %d \t queue length: %d", depth, exploreQueue.Length())
-
-	for node, children := range adjList {
-		log.Printf("node %d", node.State.You.Head)
-		for _, child := range children {
-			log.Printf("child %d", child.State.You.Head)
-		}
-	}
+	log.Printf("game tree depth: %d", depth)
 
 	return adjList, &root
 }
@@ -237,7 +226,7 @@ func searchGameTree(adjList map[*Node][]*Node, root *Node) BattlesnakeMoveRespon
 	shout := "tree move"
 	// Max^n search
 	reward := maxN(root, adjList)
-	// sort moves by reward
+	// get children of root node
 	children := adjList[root]
 	// log reward slice
 	log.Printf("Reward: %d", reward)
@@ -248,7 +237,8 @@ func searchGameTree(adjList map[*Node][]*Node, root *Node) BattlesnakeMoveRespon
 	return BattlesnakeMoveResponse{bestNode(children).Move, shout}
 }
 
-func maxN(n *Node, adjList map[*Node][]*Node) []int {
+func maxN(n *Node, adjList map[*Node][]*Node) int {
+	// ensure adjList has key n
 	if children, ok := adjList[n]; ok {
 		// reached terminal node, return reward
 		if n.isTerminal() {
@@ -269,9 +259,9 @@ func bestNode(nodes []*Node) *Node {
 	reward := 0
 	var node *Node
 	for _, n := range nodes {
-		if n.Reward[n.Player] >= reward {
+		if n.Reward >= reward {
 			node = n
-			reward = n.Reward[n.Player]
+			reward = n.Reward
 		}
 	}
 	return node
