@@ -1,7 +1,8 @@
 package main
 
 import (
-	"log"
+	"strconv"
+	"time"
 
 	queue "github.com/eapache/queue"
 )
@@ -168,7 +169,7 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	}
 }
 
-func buildGameTree(state *GameState, depth int) (map[*Node][]*Node, *Node) {
+func buildGameTree(state *GameState, timeout time.Duration) (map[*Node][]*Node, *Node, int) {
 	// create adjacency list
 	// key = &Node, val = [&child1, &child2 ...]
 	adjList := make(map[*Node][]*Node)
@@ -182,17 +183,25 @@ func buildGameTree(state *GameState, depth int) (map[*Node][]*Node, *Node) {
 	// create explore queue
 	exploreQueue := queue.New()
 
+	// measure tree depth
+	depth := 0
+
 	// enqueue root
-	// log.Printf("add root to queue")
 	exploreQueue.Add(&root)
 
-	currDepth := 0
+	// start timer
+	start := time.Now()
+
+	// loop counter
+	i := 0
 
 	// build tree
-	for currDepth < depth {
-		// ensure queue is not empty
-		if exploreQueue.Length() == 0 {
-			break
+	for exploreQueue.Length() != 0 {
+		// check timeout every 16th iteration using bitmask
+		if i&0x0f == 0 {
+			if time.Since(start) > timeout {
+				break
+			}
 		}
 		// get next node to explore
 		curr := exploreQueue.Remove().(*Node)
@@ -202,28 +211,28 @@ func buildGameTree(state *GameState, depth int) (map[*Node][]*Node, *Node) {
 		for _, child := range adjList[curr] {
 			exploreQueue.Add(child)
 		}
-		// update current depth
-		currDepth = curr.State.Turn - root.State.Turn
+		// update depth
+		currDepth := curr.State.Turn - root.State.Turn
+		if currDepth > depth {
+			depth = currDepth
+		}
+		// update counter
+		i++
 	}
 
-	log.Printf("game tree depth: %d", depth)
-
-	return adjList, &root
+	return adjList, &root, depth
 }
 
 func searchGameTree(adjList map[*Node][]*Node, root *Node) BattlesnakeMoveResponse {
-	shout := "tree move"
 	// Max^n search
 	reward := maxN(root, adjList)
 	// get children of root node
 	children := adjList[root]
-	// log reward slice
-	log.Printf("Reward: %d", reward)
 	if len(children) == 0 {
 		return BattlesnakeMoveResponse{"up", "no valid moves"}
 	}
 	// return best move response
-	return BattlesnakeMoveResponse{bestNode(children).Move, shout}
+	return BattlesnakeMoveResponse{bestNode(children).Move, strconv.Itoa(reward)}
 }
 
 func maxN(n *Node, adjList map[*Node][]*Node) int {

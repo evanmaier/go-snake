@@ -244,8 +244,8 @@ func TestMoveRuntime(t *testing.T) {
 		Length: 4,
 	}
 	board := Board{
-		Height: 10,
-		Width:  10,
+		Height: 11,
+		Width:  11,
 		Food:   []Coord{{X: 2, Y: 0}},
 		Snakes: []Battlesnake{snake},
 	}
