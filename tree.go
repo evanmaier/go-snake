@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"time"
 
 	queue "github.com/eapache/queue"
 )
@@ -169,21 +168,13 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	}
 }
 
-func buildGameTree(state GameState, timeout time.Duration) (map[*Node][]*Node, *Node) {
-	// start timer
-	// start := time.Now()
+func buildGameTree(state GameState) (map[*Node][]*Node, *Node) {
 	// init search depth counter
 	depth := 0
 
 	// create adjacency list
 	// key = &Node, val = [&child1, &child2 ...]
 	adjList := make(map[*Node][]*Node)
-
-	// create ID map
-	idMap := make(map[int]string)
-	for i, snake := range state.Board.Snakes {
-		idMap[i] = snake.ID
-	}
 
 	// init root
 	root := Node{
@@ -199,14 +190,12 @@ func buildGameTree(state GameState, timeout time.Duration) (map[*Node][]*Node, *
 	exploreQueue.Add(&root)
 
 	// build tree
-	//for time.Since(start) < timeout {
 	for depth < 10 {
 		// ensure queue is not empty
 		if exploreQueue.Length() == 0 {
 			break
 		}
 		// get next node to explore
-		// log.Printf("removing from queue")
 		curr := exploreQueue.Remove().(*Node)
 		depth = curr.State.Turn - root.State.Turn
 		// add curr to adjList

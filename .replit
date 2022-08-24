@@ -1,5 +1,5 @@
 language = "go"
-run = "go run main.go logic.go"
+run = "go run main.go logic.go tree.go"
 
 [nix]
 channel = "stable-22_05"

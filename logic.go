@@ -7,7 +7,6 @@ package main
 
 import (
 	"log"
-	"time"
 )
 
 // This function is called when you register your Battlesnake on play.battlesnake.com
@@ -37,8 +36,7 @@ func end(state GameState) {
 // where to move -- valid moves are "up", "down", "left", or "right".
 func move(state GameState) BattlesnakeMoveResponse {
 	move := BattlesnakeMoveResponse{"up", "default move"}
-	timeout, _ := time.ParseDuration("400ms")
-	adjList, root := buildGameTree(state, timeout)
+	adjList, root := buildGameTree(state)
 	bestMove := searchGameTree(adjList, root) // TODO: add timout
 	validMoves := []string{"up", "down", "right", "left"}
 	for _, m := range validMoves {
