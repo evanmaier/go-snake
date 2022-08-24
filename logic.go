@@ -36,8 +36,8 @@ func end(state GameState) {
 // where to move -- valid moves are "up", "down", "left", or "right".
 func move(state GameState) BattlesnakeMoveResponse {
 	move := BattlesnakeMoveResponse{"up", "default move"}
-	adjList, root := buildGameTree(state)
-	bestMove := searchGameTree(adjList, root) // TODO: add timout
+	adjList, root := buildGameTree(&state, 10)
+	bestMove := searchGameTree(adjList, root)
 	validMoves := []string{"up", "down", "right", "left"}
 	for _, m := range validMoves {
 		if bestMove.Move == m {

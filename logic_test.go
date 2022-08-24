@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 func TestUpdateSnake(t *testing.T) {
@@ -26,11 +27,11 @@ func TestUpdateSnake(t *testing.T) {
 	}
 	node := Node{
 		Move:   "right",
-		State:  state,
+		State:  &state,
 		Reward: 0,
 	}
 	// Tests
-	updateSnake(&node.State.You, &node.State, "up")
+	updateSnake(&node.State.You, node.State, "up")
 	expectedResult := []Coord{{X: 2, Y: 1}, {X: 2, Y: 0}, {X: 1, Y: 0}, {X: 1, Y: 0}}
 	// Test head
 	if (node.State.You.Head.X != 2) || (node.State.You.Head.Y != 1) {
@@ -78,7 +79,7 @@ func TestGetPossibleMoves(t *testing.T) {
 	}
 	node := Node{
 		Move:   "up",
-		State:  state,
+		State:  &state,
 		Reward: 0,
 	}
 
@@ -115,7 +116,7 @@ func TestIsTerminal(t *testing.T) {
 	}
 	node := Node{
 		Move:   "right",
-		State:  state,
+		State:  &state,
 		Reward: 0,
 	}
 
@@ -147,7 +148,7 @@ func TestGetReward(t *testing.T) {
 	}
 	node := Node{
 		Move:   "right",
-		State:  state,
+		State:  &state,
 		Reward: 0,
 	}
 
@@ -179,7 +180,7 @@ func TestApplyAction(t *testing.T) {
 	}
 	node := Node{
 		Move:   "right",
-		State:  state,
+		State:  &state,
 		Reward: 0,
 	}
 
@@ -218,7 +219,7 @@ func TestGetChildren(t *testing.T) {
 	}
 	node := Node{
 		Move:   "right",
-		State:  state,
+		State:  &state,
 		Reward: 0,
 	}
 
@@ -230,5 +231,32 @@ func TestGetChildren(t *testing.T) {
 	for _, n := range children {
 		t.Logf("%d", n.State.You.Head)
 	}
+
+}
+
+func TestMoveRuntime(t *testing.T) {
+	// Setup
+	snake := Battlesnake{
+		// Length 3, facing right
+		Head:   Coord{X: 1, Y: 0},
+		Body:   []Coord{{X: 1, Y: 0}, {X: 0, Y: 0}, {X: 0, Y: 1}, {0, 1}},
+		Health: 100,
+		Length: 4,
+	}
+	board := Board{
+		Height: 10,
+		Width:  10,
+		Food:   []Coord{{X: 2, Y: 0}},
+		Snakes: []Battlesnake{snake},
+	}
+	state := GameState{
+		Turn:  3,
+		Board: board,
+		You:   snake,
+	}
+	start := time.Now()
+	response := move(state)
+	t.Log(response)
+	t.Logf("move() took %s", time.Since(start))
 
 }

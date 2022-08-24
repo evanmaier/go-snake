@@ -8,7 +8,7 @@ import (
 
 type Node struct {
 	Move   string
-	State  GameState
+	State  *GameState
 	Reward int
 }
 
@@ -119,12 +119,12 @@ func (n Node) applyAction(action string) *Node {
 	// Create new node
 	newNode := Node{
 		Move:   action,
-		State:  newState,
+		State:  &newState,
 		Reward: 0,
 	}
 
 	// update snake
-	updateSnake(&newNode.State.You, &newNode.State, action)
+	updateSnake(&newNode.State.You, &newState, action)
 	newNode.State.Turn += 1
 
 	// get reward
@@ -168,10 +168,7 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	}
 }
 
-func buildGameTree(state GameState) (map[*Node][]*Node, *Node) {
-	// init search depth counter
-	depth := 0
-
+func buildGameTree(state *GameState, depth int) (map[*Node][]*Node, *Node) {
 	// create adjacency list
 	// key = &Node, val = [&child1, &child2 ...]
 	adjList := make(map[*Node][]*Node)
@@ -189,21 +186,24 @@ func buildGameTree(state GameState) (map[*Node][]*Node, *Node) {
 	// log.Printf("add root to queue")
 	exploreQueue.Add(&root)
 
+	currDepth := 0
+
 	// build tree
-	for depth < 10 {
+	for currDepth < depth {
 		// ensure queue is not empty
 		if exploreQueue.Length() == 0 {
 			break
 		}
 		// get next node to explore
 		curr := exploreQueue.Remove().(*Node)
-		depth = curr.State.Turn - root.State.Turn
 		// add curr to adjList
 		adjList[curr] = curr.getChildren()
 		// add curr's children to explore queue
 		for _, child := range adjList[curr] {
 			exploreQueue.Add(child)
 		}
+		// update current depth
+		currDepth = curr.State.Turn - root.State.Turn
 	}
 
 	log.Printf("game tree depth: %d", depth)
