@@ -8,14 +8,20 @@ import (
 )
 
 type Node struct {
+	Player   int
 	Move     string
-	State    *GameState
-	Reward   int
-	children []*Node
+	Turn     int
+	Height   int
+	Width    int
+	Rewards  map[int]int
+	Snakes   map[int]Battlesnake
+	Food     []Coord
+	Children []*Node
 }
 
 // get valid moves in a position
 func (n Node) getPossibleMoves() []string {
+	snake := n.Snakes[n.Player]
 	possibleMoves := make([]string, 0, 4)
 	validMoves := map[string]bool{
 		"up":    true,
@@ -23,18 +29,15 @@ func (n Node) getPossibleMoves() []string {
 		"right": true,
 		"left":  true,
 	}
-	snake := n.State.You
-	width := n.State.Board.Width
-	height := n.State.Board.Height
 
 	// avoid walls
-	if height-snake.Head.Y == 1 {
+	if n.Height-snake.Head.Y == 1 {
 		validMoves["up"] = false
 	}
 	if snake.Head.Y == 0 {
 		validMoves["down"] = false
 	}
-	if width-snake.Head.X == 1 {
+	if n.Width-snake.Head.X == 1 {
 		validMoves["right"] = false
 	}
 	if snake.Head.X == 0 {
@@ -83,46 +86,64 @@ func (n Node) getPossibleMoves() []string {
 	return possibleMoves
 }
 
-// evaluate game state and return reward
-func (n Node) getReward() int {
-	return n.State.Turn
+// evaluate game state and update player's reward
+func (n *Node) getReward() {
+	n.Rewards[n.Player] = n.Turn / len(n.Snakes)
 }
 
-// return children of node
+// update children of node
 func (n *Node) getChildren() {
-	for _, action := range n.getPossibleMoves() {
-		n.children = append(n.children, n.applyAction(action))
+	if n.Snakes[0].Health > 0 {
+		for _, action := range n.getPossibleMoves() {
+			n.Children = append(n.Children, n.applyAction(action))
+		}
 	}
 }
 
 // apply action to node, returning new node
 func (n Node) applyAction(action string) *Node {
-	// create new state
-	newState := GameState{
-		Game:  n.State.Game,
-		Turn:  n.State.Turn,
-		Board: n.State.Board,
-		You:   n.State.You,
-	}
-
 	// Create new node
 	newNode := Node{
-		Move:   action,
-		State:  &newState,
-		Reward: 0,
+		Player:   (n.Player + 1) % len(n.Snakes),
+		Turn:     n.Turn,
+		Height:   n.Height,
+		Width:    n.Width,
+		Move:     action,
+		Rewards:  make(map[int]int),
+		Snakes:   make(map[int]Battlesnake),
+		Food:     make([]Coord, len(n.Food)),
+		Children: make([]*Node, 0, 3),
 	}
 
-	// update snake
-	updateSnake(&newNode.State.You, &newState, action)
-	newNode.State.Turn += 1
+	// assign rewards
+	for player, reward := range n.Rewards {
+		newNode.Rewards[player] = reward
+	}
+
+	// assign snakes
+	for player, snake := range n.Snakes {
+		newNode.Snakes[player] = snake
+	}
+
+	// assign food
+	copy(newNode.Food, n.Food)
+
+	// update turn
+	if newNode.Player == 0 {
+		newNode.Turn += 1
+	}
+
+	// update snakes
+	newNode.updateSnakes(action)
 
 	// get reward
-	newNode.Reward = newNode.getReward()
+	newNode.getReward()
 
 	return &newNode
 }
 
-func updateSnake(snake *Battlesnake, state *GameState, action string) {
+func (n *Node) updateSnakes(action string) {
+	snake := n.Snakes[n.Player]
 	// move head
 	switch action {
 	case "up":
@@ -141,13 +162,13 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	// update health
 	snake.Health -= 1
 	// eat food
-	for i, coord := range state.Board.Food {
+	for i, coord := range n.Food {
 		if coord == snake.Head {
 			// duplicate tail
 			snake.Body = append(snake.Body, snake.Body[len(snake.Body)-1])
 			// remove food
-			state.Board.Food[i] = state.Board.Food[len(state.Board.Food)-1]
-			state.Board.Food = state.Board.Food[:len(state.Board.Food)-1]
+			n.Food[i] = n.Food[len(n.Food)-1]
+			n.Food = n.Food[:len(n.Food)-1]
 			// update health
 			snake.Health = 100
 			// update length
@@ -158,14 +179,50 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 }
 
 func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
-	// init root
-	root := Node{State: state}
+	/*
+		Node {
+		Player 	int
+		Turn 	int
+		Height  int
+		Width   int
+		Move 	string
+		Rewards map[int]int
+		Snakes 	map[int]Battlesnake
+		Food 	[]Coord
+		Children[]*Node
+		}
+	*/
+
+	// create root node
+	root := Node{
+		Player:   0,
+		Move:     "up",
+		Turn:     state.Turn,
+		Height:   state.Board.Height,
+		Width:    state.Board.Width,
+		Rewards:  make(map[int]int),
+		Snakes:   make(map[int]Battlesnake),
+		Food:     make([]Coord, len(state.Board.Food)),
+		Children: make([]*Node, 0, 3),
+	}
+
+	// assign snakes and rewards
+	i := 1
+	for j, snake := range state.Board.Snakes {
+		if snake.ID == state.You.ID {
+			root.Snakes[0] = snake
+		} else {
+			root.Snakes[i] = snake
+			i++
+		}
+		root.Rewards[j] = 0
+	}
+
+	// assign food
+	copy(root.Food, state.Board.Food)
 
 	// q holds nodes to explore next
 	q := queue.New()
-
-	// init tree depth
-	depth := 0
 
 	// enqueue root
 	q.Add(&root)
@@ -173,7 +230,10 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 	// start timer
 	start := time.Now()
 
-	i := 0
+	// init counters
+	depth := 0
+	i = 0
+
 	// build tree
 	for q.Length() != 0 {
 		// check timeout every 16th iteration using bitmask
@@ -187,11 +247,11 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 		// get children of curr
 		curr.getChildren()
 		// add curr's children to explore queue
-		for _, child := range curr.children {
+		for _, child := range curr.Children {
 			q.Add(child)
 		}
-		// update depth
-		currDepth := curr.State.Turn - root.State.Turn
+		// update counters
+		currDepth := curr.Turn - root.Turn
 		if currDepth > depth {
 			depth = currDepth
 		}
@@ -202,35 +262,36 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 }
 
 func searchGameTree(root *Node) BattlesnakeMoveResponse {
-	// Max^n search
-	reward := max(root)
-	if len(root.children) == 0 {
+	// maxN search
+	reward := maxN(root)
+	if len(root.Children) == 0 {
 		return BattlesnakeMoveResponse{"up", "no valid moves"}
 	}
 	// return best move response
-	return BattlesnakeMoveResponse{bestNode(root.children).Move, strconv.Itoa(reward)}
+	return BattlesnakeMoveResponse{bestNode(root.Children).Move, strconv.Itoa(reward)}
 }
 
-func max(n *Node) int {
+func maxN(n *Node) int {
 	// reached leaf node
-	if len(n.children) == 0 {
-		return n.Reward
+	if len(n.Children) == 0 {
+		return n.Rewards[0]
 	}
 	// n is an internal node, recurse
-	for _, child := range n.children {
-		child.Reward = max(child)
+	for _, child := range n.Children {
+		child.Rewards[child.Player] = maxN(child)
 	}
 	// find and return best reward for current player
-	return bestNode(n.children).Reward
+	bestChild := bestNode(n.Children)
+	return bestChild.Rewards[bestChild.Player]
 }
 
 func bestNode(nodes []*Node) *Node {
 	reward := 0
 	var node *Node
 	for _, n := range nodes {
-		if n.Reward >= reward {
+		if n.Rewards[n.Player] >= reward {
 			node = n
-			reward = n.Reward
+			reward = n.Rewards[n.Player]
 		}
 	}
 	return node
