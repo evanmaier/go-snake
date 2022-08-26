@@ -8,9 +8,10 @@ import (
 )
 
 type Node struct {
-	Move   string
-	State  *GameState
-	Reward int
+	Move     string
+	State    *GameState
+	Reward   int
+	children []*Node
 }
 
 // get valid moves in a position
@@ -82,29 +83,16 @@ func (n Node) getPossibleMoves() []string {
 	return possibleMoves
 }
 
-// determine if node is terminal
-func (n Node) isTerminal() bool {
-	if n.State.You.Health == 0 {
-		return true
-	}
-	if len(n.getPossibleMoves()) == 0 {
-		return true
-	}
-	return false
-}
-
 // evaluate game state and return reward
 func (n Node) getReward() int {
 	return n.State.Turn
 }
 
 // return children of node
-func (n Node) getChildren() []*Node {
-	children := make([]*Node, 0, 3)
+func (n *Node) getChildren() {
 	for _, action := range n.getPossibleMoves() {
-		children = append(children, n.applyAction(action))
+		n.children = append(n.children, n.applyAction(action))
 	}
-	return children
 }
 
 // apply action to node, returning new node
@@ -169,34 +157,25 @@ func updateSnake(snake *Battlesnake, state *GameState, action string) {
 	}
 }
 
-func buildGameTree(state *GameState, timeout time.Duration) (map[*Node][]*Node, *Node, int) {
-	// create adjacency list
-	// key = &Node, val = [&child1, &child2 ...]
-	adjList := make(map[*Node][]*Node)
-
+func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 	// init root
-	root := Node{
-		State:  state,
-		Reward: 0,
-	}
+	root := Node{State: state}
 
-	// create explore queue
-	exploreQueue := queue.New()
+	// q holds nodes to explore next
+	q := queue.New()
 
-	// measure tree depth
+	// init tree depth
 	depth := 0
 
 	// enqueue root
-	exploreQueue.Add(&root)
+	q.Add(&root)
 
 	// start timer
 	start := time.Now()
 
-	// loop counter
 	i := 0
-
 	// build tree
-	for exploreQueue.Length() != 0 {
+	for q.Length() != 0 {
 		// check timeout every 16th iteration using bitmask
 		if i&0x0f == 0 {
 			if time.Since(start) > timeout {
@@ -204,53 +183,45 @@ func buildGameTree(state *GameState, timeout time.Duration) (map[*Node][]*Node, 
 			}
 		}
 		// get next node to explore
-		curr := exploreQueue.Remove().(*Node)
-		// add curr to adjList
-		adjList[curr] = curr.getChildren()
+		curr := q.Remove().(*Node)
+		// get children of curr
+		curr.getChildren()
 		// add curr's children to explore queue
-		for _, child := range adjList[curr] {
-			exploreQueue.Add(child)
+		for _, child := range curr.children {
+			q.Add(child)
 		}
 		// update depth
 		currDepth := curr.State.Turn - root.State.Turn
 		if currDepth > depth {
 			depth = currDepth
 		}
-		// update counter
 		i++
 	}
 
-	return adjList, &root, depth
+	return &root, depth
 }
 
-func searchGameTree(adjList map[*Node][]*Node, root *Node) BattlesnakeMoveResponse {
+func searchGameTree(root *Node) BattlesnakeMoveResponse {
 	// Max^n search
-	reward := maxN(root, adjList)
-	// get children of root node
-	children := adjList[root]
-	if len(children) == 0 {
+	reward := max(root)
+	if len(root.children) == 0 {
 		return BattlesnakeMoveResponse{"up", "no valid moves"}
 	}
 	// return best move response
-	return BattlesnakeMoveResponse{bestNode(children).Move, strconv.Itoa(reward)}
+	return BattlesnakeMoveResponse{bestNode(root.children).Move, strconv.Itoa(reward)}
 }
 
-func maxN(n *Node, adjList map[*Node][]*Node) int {
-	// ensure adjList has key n
-	if children, ok := adjList[n]; ok {
-		// reached terminal node, return reward
-		if n.isTerminal() {
-			return n.Reward
-		}
-		// n is an internal node, recurse
-		for _, child := range children {
-			child.Reward = maxN(child, adjList)
-		}
-		// find and return best reward for current player
-		return bestNode(children).Reward
+func max(n *Node) int {
+	// reached leaf node
+	if len(n.children) == 0 {
+		return n.Reward
 	}
-	// reached leaf node, return reward
-	return n.Reward
+	// n is an internal node, recurse
+	for _, child := range n.children {
+		child.Reward = max(child)
+	}
+	// find and return best reward for current player
+	return bestNode(n.children).Reward
 }
 
 func bestNode(nodes []*Node) *Node {

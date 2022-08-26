@@ -94,38 +94,6 @@ func TestGetPossibleMoves(t *testing.T) {
 
 }
 
-func TestIsTerminal(t *testing.T) {
-	// Setup
-	snake := Battlesnake{
-		// Length 3, facing right
-		Head:   Coord{X: 2, Y: 0},
-		Body:   []Coord{{X: 2, Y: 0}, {X: 1, Y: 0}, {X: 0, Y: 0}},
-		Health: 0,
-		Length: 3,
-	}
-	board := Board{
-		Height: 1,
-		Width:  3,
-		Food:   []Coord{{X: 2, Y: 1}},
-		Snakes: []Battlesnake{snake},
-	}
-	state := GameState{
-		Turn:  0,
-		Board: board,
-		You:   snake,
-	}
-	node := Node{
-		Move:   "right",
-		State:  &state,
-		Reward: 0,
-	}
-
-	// Tests
-	if !node.isTerminal() {
-		t.Error("terminal node not detected")
-	}
-}
-
 func TestGetReward(t *testing.T) {
 	// Setup
 	snake := Battlesnake{
@@ -224,11 +192,11 @@ func TestGetChildren(t *testing.T) {
 	}
 
 	// Tests
-	children := node.getChildren()
-	if len(children) != 2 {
+	node.getChildren()
+	if len(node.children) != 2 {
 		t.Error("wrong number of children")
 	}
-	for _, n := range children {
+	for _, n := range node.children {
 		t.Logf("%d", n.State.You.Head)
 	}
 
