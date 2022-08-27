@@ -13,9 +13,9 @@ type Node struct {
 	Turn     int
 	Height   int
 	Width    int
+	Reward   int
 	Snakes   map[int]Battlesnake
 	Food     map[int]Coord
-	Rewards  []int
 	Children []*Node
 }
 
@@ -88,7 +88,7 @@ func (n Node) getPossibleMoves() []string {
 
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
-	n.Rewards[n.Player] = n.Turn / len(n.Snakes)
+	n.Reward = n.Turn / len(n.Snakes)
 }
 
 // update children of node
@@ -109,7 +109,7 @@ func (n Node) applyAction(action string) *Node {
 		Move:     action,
 		Snakes:   make(map[int]Battlesnake),
 		Food:     make(map[int]Coord),
-		Rewards:  make([]int, len(n.Snakes)),
+		Reward:   0,
 		Children: make([]*Node, 0),
 	}
 
@@ -182,22 +182,21 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 		Turn:     state.Turn,
 		Height:   state.Board.Height,
 		Width:    state.Board.Width,
+		Reward:   0,
 		Snakes:   make(map[int]Battlesnake),
 		Food:     make(map[int]Coord),
-		Rewards:  make([]int, len(state.Board.Snakes)),
 		Children: make([]*Node, 0),
 	}
 
-	// assign snakes and rewards
+	// assign snakes
 	i := 1
-	for j, snake := range state.Board.Snakes {
+	for _, snake := range state.Board.Snakes {
 		if snake.ID == state.You.ID {
 			root.Snakes[0] = snake
 		} else {
 			root.Snakes[i] = snake
 			i++
 		}
-		root.Rewards[j] = 0
 	}
 
 	// assign food
@@ -247,35 +246,67 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 
 func searchGameTree(root *Node) BattlesnakeMoveResponse {
 	// maxN search
-	rewards := maxN(root)
+	reward := paranoid(root)
 	if len(root.Children) == 0 {
 		return BattlesnakeMoveResponse{"up", "no valid moves"}
 	}
 	// return best move response
-	return BattlesnakeMoveResponse{bestNode(root.Children, root.Player).Move, strconv.Itoa(rewards[0])}
+	return BattlesnakeMoveResponse{maxNode(root.Children).Move, strconv.Itoa(reward)}
 }
 
-func maxN(n *Node) []int {
+// func maxN(n *Node) []int {
+// 	// reached leaf node
+// 	if len(n.Children) == 0 {
+// 		return n.Rewards
+// 	}
+// 	// n is an internal node, recurse
+// 	for _, child := range n.Children {
+// 		child.Rewards = maxN(child)
+// 	}
+// 	// find and return best reward for current player
+// 	bestChild := bestNode(n.Children, n.Player)
+// 	return bestChild.Rewards
+// }
+
+func paranoid(n *Node) int {
 	// reached leaf node
 	if len(n.Children) == 0 {
-		return n.Rewards
+		return n.Reward
 	}
-	// n is an internal node, recurse
+	// internal node, recurse
 	for _, child := range n.Children {
-		child.Rewards = maxN(child)
+		child.Reward = paranoid(child)
 	}
-	// find and return best reward for current player
-	bestChild := bestNode(n.Children, n.Player)
-	return bestChild.Rewards
+	// Min or Max reward depending on player
+	switch n.Player {
+	case 0:
+		//Max reward
+		return maxNode(n.Children).Reward
+	default:
+		//Min reward
+		return minNode(n.Children).Reward
+	}
 }
 
-func bestNode(nodes []*Node, player int) *Node {
-	reward := 0
-	var node *Node
+func maxNode(nodes []*Node) *Node {
+	node := nodes[0]
+	reward := node.Reward
 	for _, n := range nodes {
-		if n.Rewards[player] >= reward {
+		if n.Reward >= reward {
 			node = n
-			reward = n.Rewards[player]
+			reward = n.Reward
+		}
+	}
+	return node
+}
+
+func minNode(nodes []*Node) *Node {
+	node := nodes[0]
+	reward := node.Reward
+	for _, n := range nodes {
+		if n.Reward < reward {
+			node = n
+			reward = n.Reward
 		}
 	}
 	return node
