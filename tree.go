@@ -88,13 +88,19 @@ func (n Node) getPossibleMoves() []string {
 
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
-	n.Reward = n.Turn / len(n.Snakes)
+	if _, ok := n.Snakes[0]; ok {
+		n.Reward = n.Turn / len(n.Snakes)
+	} else {
+		n.Reward = -1
+	}
 }
 
-// update children of node
+// update children of node if we are alive
 func (n *Node) getChildren() {
-	for _, action := range n.getPossibleMoves() {
-		n.Children = append(n.Children, n.applyAction(action))
+	if _, ok := n.Snakes[0]; ok {
+		for _, action := range n.getPossibleMoves() {
+			n.Children = append(n.Children, n.applyAction(action))
+		}
 	}
 }
 
@@ -170,8 +176,13 @@ func (n *Node) updateSnakes(action string) {
 			break
 		}
 	}
-	// replace old snake with updated snake
-	n.Snakes[n.Player] = snake
+	// handle starving
+	if snake.Health == 0 {
+		delete(n.Snakes, n.Player)
+	} else {
+		// replace old snake with updated snake
+		n.Snakes[n.Player] = snake
+	}
 }
 
 func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
