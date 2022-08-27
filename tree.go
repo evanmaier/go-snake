@@ -13,15 +13,14 @@ type Node struct {
 	Turn     int
 	Height   int
 	Width    int
-	Rewards  map[int]int
 	Snakes   map[int]Battlesnake
-	Food     []Coord
+	Food     map[int]Coord
+	Rewards  []int
 	Children []*Node
 }
 
 // get valid moves in a position
 func (n Node) getPossibleMoves() []string {
-	snake := n.Snakes[n.Player]
 	possibleMoves := make([]string, 0, 4)
 	validMoves := map[string]bool{
 		"up":    true,
@@ -31,49 +30,50 @@ func (n Node) getPossibleMoves() []string {
 	}
 
 	// avoid walls
-	if n.Height-snake.Head.Y == 1 {
+	if n.Height-n.Snakes[n.Player].Head.Y == 1 {
 		validMoves["up"] = false
 	}
-	if snake.Head.Y == 0 {
+	if n.Snakes[n.Player].Head.Y == 0 {
 		validMoves["down"] = false
 	}
-	if n.Width-snake.Head.X == 1 {
+	if n.Width-n.Snakes[n.Player].Head.X == 1 {
 		validMoves["right"] = false
 	}
-	if snake.Head.X == 0 {
+	if n.Snakes[n.Player].Head.X == 0 {
 		validMoves["left"] = false
 	}
 
-	// avoid snake(s)
 	up := Coord{
-		X: snake.Head.X,
-		Y: snake.Head.Y + 1,
+		X: n.Snakes[n.Player].Head.X,
+		Y: n.Snakes[n.Player].Head.Y + 1,
 	}
 	down := Coord{
-		X: snake.Head.X,
-		Y: snake.Head.Y - 1,
+		X: n.Snakes[n.Player].Head.X,
+		Y: n.Snakes[n.Player].Head.Y - 1,
 	}
 	right := Coord{
-		X: snake.Head.X + 1,
-		Y: snake.Head.Y,
+		X: n.Snakes[n.Player].Head.X + 1,
+		Y: n.Snakes[n.Player].Head.Y,
 	}
 	left := Coord{
-		X: snake.Head.X - 1,
-		Y: snake.Head.Y,
+		X: n.Snakes[n.Player].Head.X - 1,
+		Y: n.Snakes[n.Player].Head.Y,
 	}
 
-	for _, coord := range snake.Body { //TODO: allow moves into tail if not eating
-		switch coord {
-		case up:
-			validMoves["up"] = false
-		case down:
-			validMoves["down"] = false
-		case right:
-			validMoves["right"] = false
-		case left:
-			validMoves["left"] = false
+	// avoid snakes TODO: allow moves into tail if not eating
+	for _, snake := range n.Snakes {
+		for _, coord := range snake.Body {
+			switch coord {
+			case up:
+				validMoves["up"] = false
+			case down:
+				validMoves["down"] = false
+			case right:
+				validMoves["right"] = false
+			case left:
+				validMoves["left"] = false
+			}
 		}
-
 	}
 
 	// fill possible moves
@@ -93,10 +93,8 @@ func (n *Node) getReward() {
 
 // update children of node
 func (n *Node) getChildren() {
-	if n.Snakes[0].Health > 0 {
-		for _, action := range n.getPossibleMoves() {
-			n.Children = append(n.Children, n.applyAction(action))
-		}
+	for _, action := range n.getPossibleMoves() {
+		n.Children = append(n.Children, n.applyAction(action))
 	}
 }
 
@@ -109,24 +107,21 @@ func (n Node) applyAction(action string) *Node {
 		Height:   n.Height,
 		Width:    n.Width,
 		Move:     action,
-		Rewards:  make(map[int]int),
 		Snakes:   make(map[int]Battlesnake),
-		Food:     make([]Coord, len(n.Food)),
-		Children: make([]*Node, 0, 3),
+		Food:     make(map[int]Coord),
+		Rewards:  make([]int, len(n.Snakes)),
+		Children: make([]*Node, 0),
 	}
 
-	// assign rewards
-	for player, reward := range n.Rewards {
-		newNode.Rewards[player] = reward
-	}
-
-	// assign snakes
+	// copy snakes
 	for player, snake := range n.Snakes {
 		newNode.Snakes[player] = snake
 	}
 
-	// assign food
-	copy(newNode.Food, n.Food)
+	// copy food
+	for i, coord := range n.Food {
+		newNode.Food[i] = coord
+	}
 
 	// update turn
 	if newNode.Player == 0 {
@@ -167,8 +162,7 @@ func (n *Node) updateSnakes(action string) {
 			// duplicate tail
 			snake.Body = append(snake.Body, snake.Body[len(snake.Body)-1])
 			// remove food
-			n.Food[i] = n.Food[len(n.Food)-1]
-			n.Food = n.Food[:len(n.Food)-1]
+			delete(n.Food, i)
 			// update health
 			snake.Health = 100
 			// update length
@@ -176,23 +170,11 @@ func (n *Node) updateSnakes(action string) {
 			break
 		}
 	}
+	// replace old snake with updated snake
+	n.Snakes[n.Player] = snake
 }
 
 func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
-	/*
-		Node {
-		Player 	int
-		Turn 	int
-		Height  int
-		Width   int
-		Move 	string
-		Rewards map[int]int
-		Snakes 	map[int]Battlesnake
-		Food 	[]Coord
-		Children[]*Node
-		}
-	*/
-
 	// create root node
 	root := Node{
 		Player:   0,
@@ -200,10 +182,10 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 		Turn:     state.Turn,
 		Height:   state.Board.Height,
 		Width:    state.Board.Width,
-		Rewards:  make(map[int]int),
 		Snakes:   make(map[int]Battlesnake),
-		Food:     make([]Coord, len(state.Board.Food)),
-		Children: make([]*Node, 0, 3),
+		Food:     make(map[int]Coord),
+		Rewards:  make([]int, len(state.Board.Snakes)),
+		Children: make([]*Node, 0),
 	}
 
 	// assign snakes and rewards
@@ -219,7 +201,9 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 	}
 
 	// assign food
-	copy(root.Food, state.Board.Food)
+	for i, coord := range state.Board.Food {
+		root.Food[i] = coord
+	}
 
 	// q holds nodes to explore next
 	q := queue.New()
@@ -263,35 +247,35 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 
 func searchGameTree(root *Node) BattlesnakeMoveResponse {
 	// maxN search
-	reward := maxN(root)
+	rewards := maxN(root)
 	if len(root.Children) == 0 {
 		return BattlesnakeMoveResponse{"up", "no valid moves"}
 	}
 	// return best move response
-	return BattlesnakeMoveResponse{bestNode(root.Children).Move, strconv.Itoa(reward)}
+	return BattlesnakeMoveResponse{bestNode(root.Children, root.Player).Move, strconv.Itoa(rewards[0])}
 }
 
-func maxN(n *Node) int {
+func maxN(n *Node) []int {
 	// reached leaf node
 	if len(n.Children) == 0 {
-		return n.Rewards[0]
+		return n.Rewards
 	}
 	// n is an internal node, recurse
 	for _, child := range n.Children {
-		child.Rewards[child.Player] = maxN(child)
+		child.Rewards = maxN(child)
 	}
 	// find and return best reward for current player
-	bestChild := bestNode(n.Children)
-	return bestChild.Rewards[bestChild.Player]
+	bestChild := bestNode(n.Children, n.Player)
+	return bestChild.Rewards
 }
 
-func bestNode(nodes []*Node) *Node {
+func bestNode(nodes []*Node, player int) *Node {
 	reward := 0
 	var node *Node
 	for _, n := range nodes {
-		if n.Rewards[n.Player] >= reward {
+		if n.Rewards[player] >= reward {
 			node = n
-			reward = n.Rewards[n.Player]
+			reward = n.Rewards[player]
 		}
 	}
 	return node
