@@ -60,9 +60,9 @@ func (n Node) getPossibleMoves() []string {
 		Y: n.Snakes[n.Player].Head.Y,
 	}
 
-	// avoid snakes TODO: allow moves into tail if not eating
+	// avoid snake bodies TODO: allow moves into tail if not eating
 	for _, snake := range n.Snakes {
-		for _, coord := range snake.Body {
+		for _, coord := range snake.Body[1:] {
 			switch coord {
 			case up:
 				validMoves["up"] = false
@@ -89,7 +89,7 @@ func (n Node) getPossibleMoves() []string {
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
 	if snake, ok := n.Snakes[0]; ok {
-		n.Reward = (n.Turn + int(snake.Length) + int(snake.Health/10)) / len(n.Snakes)
+		n.Reward = (n.Turn + int(snake.Length)) / len(n.Snakes)
 	} else {
 		n.Reward = -1
 	}
@@ -176,13 +176,22 @@ func (n *Node) updateSnakes(action string) {
 			break
 		}
 	}
-	// handle starving
-	if snake.Health == 0 {
+	// handle starving and collisions
+	if snake.Health == 0 || lostCollision(n, &snake) {
 		delete(n.Snakes, n.Player)
 	} else {
 		// replace old snake with updated snake
 		n.Snakes[n.Player] = snake
 	}
+}
+
+func lostCollision(n *Node, snake *Battlesnake) bool {
+	for _, s := range n.Snakes {
+		if snake.Head == s.Head && snake.Length <= s.Length {
+			return true
+		}
+	}
+	return false
 }
 
 func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
