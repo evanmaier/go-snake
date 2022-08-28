@@ -88,8 +88,8 @@ func (n Node) getPossibleMoves() []string {
 
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
-	if _, ok := n.Snakes[0]; ok {
-		n.Reward = n.Turn + int(n.Snakes[0].Length)/len(n.Snakes)
+	if snake, ok := n.Snakes[0]; ok {
+		n.Reward = (n.Turn + int(snake.Length) + int(snake.Health/10)) / len(n.Snakes)
 	} else {
 		n.Reward = -1
 	}
