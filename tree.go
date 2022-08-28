@@ -14,6 +14,7 @@ type Node struct {
 	Height   int
 	Width    int
 	Reward   int
+	Growth   int
 	Snakes   map[int]Battlesnake
 	Food     map[int]Coord
 	Children []*Node
@@ -88,8 +89,8 @@ func (n Node) getPossibleMoves() []string {
 
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
-	if snake, ok := n.Snakes[0]; ok {
-		n.Reward = (n.Turn + int(snake.Length)) / len(n.Snakes)
+	if _, ok := n.Snakes[0]; ok {
+		n.Reward = (n.Turn + n.Growth) / len(n.Snakes)
 	} else {
 		n.Reward = -1
 	}
@@ -116,6 +117,7 @@ func (n Node) applyAction(action string) *Node {
 		Snakes:   make(map[int]Battlesnake),
 		Food:     make(map[int]Coord),
 		Reward:   0,
+		Growth:   n.Growth,
 		Children: make([]*Node, 0),
 	}
 
@@ -131,7 +133,7 @@ func (n Node) applyAction(action string) *Node {
 
 	// update turn
 	if newNode.Player == 0 {
-		newNode.Turn += 1
+		newNode.Turn++
 	}
 
 	// update snakes
@@ -148,20 +150,20 @@ func (n *Node) updateSnakes(action string) {
 	// move head
 	switch action {
 	case "up":
-		snake.Head.Y += 1
+		snake.Head.Y++
 	case "down":
-		snake.Head.Y -= 1
+		snake.Head.Y--
 	case "left":
-		snake.Head.X -= 1
+		snake.Head.X--
 	case "right":
-		snake.Head.X += 1
+		snake.Head.X++
 	}
 	// add new head to body
 	snake.Body = append([]Coord{snake.Head}, snake.Body...)
 	// remove tail
 	snake.Body = snake.Body[:len(snake.Body)-1]
 	// update health
-	snake.Health -= 1
+	snake.Health--
 	// eat food
 	for i, coord := range n.Food {
 		if coord == snake.Head {
@@ -172,7 +174,11 @@ func (n *Node) updateSnakes(action string) {
 			// update health
 			snake.Health = 100
 			// update length
-			snake.Length += 1
+			snake.Length++
+			// update growth
+			if n.Player == 0 {
+				n.Growth++
+			}
 			break
 		}
 	}
@@ -185,9 +191,9 @@ func (n *Node) updateSnakes(action string) {
 	}
 }
 
-func lostCollision(n *Node, snake *Battlesnake) bool {
-	for _, s := range n.Snakes {
-		if snake.Head == s.Head && snake.Length <= s.Length {
+func lostCollision(n *Node, snake1 *Battlesnake) bool {
+	for _, snake2 := range n.Snakes {
+		if snake1.Head == snake2.Head && snake1.Length <= snake2.Length {
 			return true
 		}
 	}
@@ -203,6 +209,7 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 		Height:   state.Board.Height,
 		Width:    state.Board.Width,
 		Reward:   0,
+		Growth:   0,
 		Snakes:   make(map[int]Battlesnake),
 		Food:     make(map[int]Coord),
 		Children: make([]*Node, 0),
