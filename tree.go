@@ -89,7 +89,7 @@ func (n Node) getPossibleMoves() []string {
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
 	if _, ok := n.Snakes[0]; ok {
-		n.Reward = n.Turn / len(n.Snakes)
+		n.Reward = n.Turn + int(n.Snakes[0].Length)/len(n.Snakes)
 	} else {
 		n.Reward = -1
 	}
@@ -190,7 +190,7 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 	root := Node{
 		Player:   0,
 		Move:     "up",
-		Turn:     state.Turn,
+		Turn:     0,
 		Height:   state.Board.Height,
 		Width:    state.Board.Width,
 		Reward:   0,
