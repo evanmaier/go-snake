@@ -174,7 +174,7 @@ func (n *Node) updateSnakes(action string) {
 			snake.Length++
 			// update growth
 			if n.Player == 0 {
-				n.Growth += (n.Growth + 1) / n.Turn
+				n.Growth += 10 / n.Turn
 			}
 			break
 		}
