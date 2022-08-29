@@ -10,11 +10,11 @@ import (
 type Node struct {
 	Player   int
 	Move     string
-	Turn     int
+	Turn     float32
 	Height   int
 	Width    int
-	Reward   int
-	Growth   int
+	Reward   float32
+	Growth   float32
 	Snakes   map[int]Battlesnake
 	Food     map[int]Coord
 	Children []*Node
@@ -90,7 +90,7 @@ func (n Node) getPossibleMoves() []string {
 // evaluate game state and update player's reward
 func (n *Node) getReward() {
 	if _, ok := n.Snakes[0]; ok {
-		n.Reward = n.Turn + n.Growth - len(n.Snakes)
+		n.Reward = n.Turn + n.Growth
 	} else {
 		n.Reward = -1
 	}
@@ -139,9 +139,6 @@ func (n Node) applyAction(action string) *Node {
 	// update snakes
 	newNode.updateSnakes(action)
 
-	// get reward
-	newNode.getReward()
-
 	return &newNode
 }
 
@@ -177,7 +174,7 @@ func (n *Node) updateSnakes(action string) {
 			snake.Length++
 			// update growth
 			if n.Player == 0 {
-				n.Growth++
+				n.Growth += (n.Growth + 1) / n.Turn
 			}
 			break
 		}
@@ -261,7 +258,7 @@ func buildGameTree(state *GameState, timeout time.Duration) (*Node, int) {
 			q.Add(child)
 		}
 		// update counters
-		currDepth := curr.Turn - root.Turn
+		currDepth := int(curr.Turn - root.Turn)
 		if currDepth > depth {
 			depth = currDepth
 		}
@@ -278,26 +275,13 @@ func searchGameTree(root *Node) BattlesnakeMoveResponse {
 		return BattlesnakeMoveResponse{"up", "no valid moves"}
 	}
 	// return best move response
-	return BattlesnakeMoveResponse{maxNode(root.Children).Move, strconv.Itoa(reward)}
+	return BattlesnakeMoveResponse{maxNode(root.Children).Move, strconv.FormatFloat(float64(reward), 'f', 3, 32)}
 }
 
-// func maxN(n *Node) []int {
-// 	// reached leaf node
-// 	if len(n.Children) == 0 {
-// 		return n.Rewards
-// 	}
-// 	// n is an internal node, recurse
-// 	for _, child := range n.Children {
-// 		child.Rewards = maxN(child)
-// 	}
-// 	// find and return best reward for current player
-// 	bestChild := bestNode(n.Children, n.Player)
-// 	return bestChild.Rewards
-// }
-
-func paranoid(n *Node) int {
+func paranoid(n *Node) float32 {
 	// reached leaf node
 	if len(n.Children) == 0 {
+		n.getReward()
 		return n.Reward
 	}
 	// internal node, recurse
